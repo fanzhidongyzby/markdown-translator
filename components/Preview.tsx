@@ -12,7 +12,7 @@ interface PreviewProps {
   theme: ThemeType;
   enableTranslation: boolean;
   onElementClick?: (text: string, offsetTop: number) => void;
-  onTranslatingStatusChange?: (isTranslating: boolean) => void;
+  onTranslatingStatusChange?: (isTranslating: boolean, progress?: { current: number; total: number }) => void;
   settings?: AISettings;
   annotations: Annotation[];
   onAddAnnotation: (text: string, note: string, contextHash: string, startOffset: number, endOffset: number) => void;
@@ -406,7 +406,9 @@ const Preview = forwardRef<HTMLDivElement, PreviewProps>(({
       }
 
       setIsTranslating(true);
-      setProgress({ current: totalBlocks - blocksToTranslate.length, total: totalBlocks });
+      const initialProgress = { current: totalBlocks - blocksToTranslate.length, total: totalBlocks };
+      setProgress(initialProgress);
+      if (onTranslatingStatusChange) onTranslatingStatusChange(true, initialProgress);
 
       const batchSize = settings?.batchSize || 10;
       const concurrency = settings?.concurrency || 3;
@@ -436,7 +438,9 @@ const Preview = forwardRef<HTMLDivElement, PreviewProps>(({
 
       const updateProgress = () => {
          completedCount++;
-         setProgress(prev => ({ ...prev, current: Math.min(completedCount, totalBlocks) }));
+         const newProgress = { current: Math.min(completedCount, totalBlocks), total: totalBlocks };
+         setProgress(newProgress);
+         if (onTranslatingStatusChange) onTranslatingStatusChange(true, newProgress);
       };
 
       const processBatch = async (batchItems: typeof blocksToTranslate) => {
@@ -507,6 +511,7 @@ const Preview = forwardRef<HTMLDivElement, PreviewProps>(({
       const checkDone = setInterval(() => {
          if (completedCount >= totalBlocks || controller.signal.aborted) {
             setIsTranslating(false);
+            if (onTranslatingStatusChange) onTranslatingStatusChange(false);
             clearInterval(checkDone);
          }
       }, 500);
@@ -602,12 +607,7 @@ const Preview = forwardRef<HTMLDivElement, PreviewProps>(({
 
   return (
     <div className="relative h-full">
-      {isTranslating && (
-        <div className="absolute top-2 right-2 z-10 bg-white/95 backdrop-blur px-4 py-2 rounded-full shadow-lg border border-emerald-100 text-xs text-emerald-700 flex items-center gap-3 pointer-events-none">
-          <Loader2 size={12} className="animate-spin text-emerald-500" />
-          <span>Translating... {Math.round((progress.current / Math.max(progress.total, 1)) * 100)}%</span>
-        </div>
-      )}
+      {isTranslating && onTranslatingStatusChange && onTranslatingStatusChange(true)}
 
       {selectionPopup && createPortal(
         <div 

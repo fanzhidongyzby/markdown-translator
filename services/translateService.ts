@@ -181,17 +181,55 @@ const customFetchStream = async (
 // --- Google Free Translation API (Fallback) ---
 const googleTranslateFree = async (text: string, onChunk?: (text: string) => void): Promise<string> => {
   try {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&q=${encodeURIComponent(text)}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Google Free API Error: ${response.status}`);
-    
-    const data = await response.json();
-    if (Array.isArray(data) && Array.isArray(data[0])) {
-      const translatedText = data[0].map((segment: any) => segment[0]).join('');
-      if (onChunk) onChunk(translatedText);
-      return translatedText;
+    // For very long texts, split into chunks to avoid URL length limits
+    const maxLength = 2000; // Safe limit for URL length
+    if (text.length > maxLength) {
+      // Split by lines to avoid breaking words
+      const lines = text.split('\n');
+      let chunks: string[] = [];
+      let currentChunk = '';
+
+      for (const line of lines) {
+        if ((currentChunk + '\n' + line).length > maxLength && currentChunk) {
+          chunks.push(currentChunk);
+          currentChunk = line;
+        } else {
+          currentChunk = currentChunk ? currentChunk + '\n' + line : line;
+        }
+      }
+      if (currentChunk) chunks.push(currentChunk);
+
+      let fullTranslated = '';
+      for (const chunk of chunks) {
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&q=${encodeURIComponent(chunk)}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Google Free API Error: ${response.status}`);
+
+        const data = await response.json();
+        if (Array.isArray(data) && Array.isArray(data[0])) {
+          const translatedText = data[0].map((segment: any) => segment[0]).join('');
+          fullTranslated += translatedText;
+        } else {
+          fullTranslated += chunk; // Fallback to original if translation fails
+        }
+      }
+
+      if (onChunk) onChunk(fullTranslated);
+      return fullTranslated;
+    } else {
+      // Standard translation for shorter texts
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&q=${encodeURIComponent(text)}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Google Free API Error: ${response.status}`);
+
+      const data = await response.json();
+      if (Array.isArray(data) && Array.isArray(data[0])) {
+        const translatedText = data[0].map((segment: any) => segment[0]).join('');
+        if (onChunk) onChunk(translatedText);
+        return translatedText;
+      }
+      return text;
     }
-    return text;
   } catch (error) {
     console.warn("Free Translation Failed", error);
     return text;

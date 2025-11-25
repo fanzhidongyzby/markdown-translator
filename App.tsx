@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from
 import {
   Layout, Palette, Monitor, Check,
   Languages, Upload, GripVertical, ChevronLeft, ChevronRight, Settings as SettingsIcon,
-  MessageSquare
+  MessageSquare, Loader2
 } from 'lucide-react';
 import Toolbar from './components/Toolbar';
 import Preview from './components/Preview';
@@ -75,6 +75,7 @@ export default function App() {
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [enableTranslation, setEnableTranslation] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [translationProgress, setTranslationProgress] = useState({ current: 0, total: 0 });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
   const [annotations, setAnnotations] = useState<Annotation[]>(() => {
@@ -560,9 +561,15 @@ export default function App() {
         >
            <div className="bg-white border-b border-gray-200 px-4 py-2 text-xs font-medium text-gray-400 uppercase tracking-wider flex justify-between items-center shrink-0">
              <div className="flex items-center gap-2">
-               <span>Preview</span>
+               <span>预览</span>
                {enableTranslation && <span className="text-orange-500 font-bold px-1.5 py-0.5 bg-orange-50 rounded text-[10px] border border-orange-100">中文</span>}
              </div>
+             {isTranslating && (
+               <div className="flex items-center gap-2 bg-white/95 backdrop-blur px-3 py-1 rounded-full shadow-sm border border-emerald-100 text-xs text-emerald-700">
+                 <Loader2 size={12} className="animate-spin text-emerald-500" />
+                 <span>翻译中... {Math.round((translationProgress.current / Math.max(translationProgress.total, 1)) * 100)}%</span>
+               </div>
+             )}
              {isMobilePreview && (
                <button onClick={() => setIsMobilePreview(false)} className="sm:hidden text-gray-500">Close</button>
              )}
@@ -577,13 +584,18 @@ export default function App() {
                   onScroll={handlePreviewScroll}
                   className="h-full overflow-y-auto scroll-smooth custom-scrollbar"
                 >
-                  <Preview 
-                    content={markdown} 
-                    theme={currentTheme} 
+                  <Preview
+                    content={markdown}
+                    theme={currentTheme}
                     enableTranslation={enableTranslation}
                     onElementClick={handlePreviewElementClick}
                     settings={aiSettings}
-                    onTranslatingStatusChange={setIsTranslating}
+                    onTranslatingStatusChange={(isTranslating, progress) => {
+                      setIsTranslating(isTranslating);
+                      if (progress) {
+                        setTranslationProgress(progress);
+                      }
+                    }}
                     annotations={annotations}
                     onAddAnnotation={handleAddAnnotation}
                     onRemoveAnnotation={handleRemoveAnnotation}
