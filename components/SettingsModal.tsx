@@ -26,9 +26,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSave, 
   });
   
   const [openaiConfig, setOpenaiConfig] = useState({
-    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+    baseUrl: 'https://api.openai.com/v1/',
     apiKey: '',
-    model: '' // No default as requested
+    model: 'gpt-4o'
   });
 
   // Initialize configs from local storage or initial settings on mount
@@ -107,9 +107,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSave, 
   const handleReset = () => {
     const defaultSettings: AISettings = {
       provider: 'google-free',
-      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+      baseUrl: '',
       apiKey: '',
-      model: 'gemini-2.5-flash', 
+      model: '',
       concurrency: 3,
       batchSize: 10
     };
@@ -118,7 +118,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSave, 
     localStorage.removeItem(STORAGE_KEYS.GEMINI);
     localStorage.removeItem(STORAGE_KEYS.OPENAI);
     setGeminiConfig({ apiKey: '', model: 'gemini-2.5-flash' });
-    setOpenaiConfig({ baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/', apiKey: '', model: '' });
+    setOpenaiConfig({ baseUrl: 'https://api.openai.com/v1/', apiKey: '', model: 'gpt-4o' });
   };
 
   return (
@@ -179,7 +179,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSave, 
               >
                 <Terminal size={18} className={settings.provider === 'custom' ? 'text-purple-500' : 'text-gray-400'} />
                 <div>
-                  <div className="font-semibold">Custom / OpenAI</div>
+                  <div className="font-semibold">OpenAI / Custom</div>
                   <div className="text-xs opacity-70 font-normal">Connect to any OpenAI-compatible API.</div>
                 </div>
               </button>

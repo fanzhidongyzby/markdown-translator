@@ -10,7 +10,7 @@ const getSettings = (overrides?: AISettings) => {
     provider: 'google-free',
     baseUrl: '',
     apiKey: '',
-    model: 'gemini-2.5-flash' // Default for SDK
+    model: ''
   } as AISettings;
 };
 
@@ -59,7 +59,7 @@ const streamGoogleGenAI = async (
   }
 };
 
-// --- Custom / OpenAI Compatible Fetch ---
+// --- OpenAI / Custom Compatible Fetch ---
 const customFetchStream = async (
   systemPrompt: string,
   userPrompt: string, 
@@ -280,10 +280,7 @@ STRICT INSTRUCTIONS:
 
   // 1. Google Gemini SDK
   if (config.provider === 'google-sdk') {
-      if (config.apiKey) {
-          return streamGoogleGenAI(systemPrompt, markdown, config, onChunk);
-      }
-      return googleTranslateFree(markdown, onChunk);
+      return streamGoogleGenAI(systemPrompt, markdown, config, onChunk);
   }
 
   // 2. Custom LLM

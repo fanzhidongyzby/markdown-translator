@@ -46,7 +46,7 @@ To use the AI translation features effectively:
 1. Click the **Settings** (Gear icon) in the top right.
 2. **Google Translate (Free)**: No configuration needed.
 3. **Google Gemini**: Enter your API Key from Google AI Studio.
-4. **Custom / OpenAI**: Configure your own endpoint and Key.
+4. **OpenAI / Custom**: Configure your own endpoint and Key.
 
 ## License
 

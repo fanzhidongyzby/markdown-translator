@@ -90,9 +90,9 @@ export default function App() {
     
     const defaults = {
       provider: 'google-free', // Default to free translation
-      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+      baseUrl: '',
       apiKey: '',
-      model: 'gemini-2.5-flash', // Default for Google SDK
+      model: '',
       concurrency: 3,
       batchSize: 10
     };
