@@ -77,6 +77,7 @@ export default function App() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationProgress, setTranslationProgress] = useState({ current: 0, total: 0 });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   
   const [annotations, setAnnotations] = useState<Annotation[]>(() => {
     const saved = localStorage.getItem('jadeMarkAnnotations');
@@ -180,6 +181,7 @@ export default function App() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setUploadedFileName(file.name);
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target?.result;
@@ -425,7 +427,7 @@ export default function App() {
             accept=".md,.txt" 
             className="hidden" 
           />
-          <button 
+          <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded-md transition-colors text-sm font-medium"
             title="Open Markdown File"
@@ -559,20 +561,29 @@ export default function App() {
           className={`bg-gray-100/50 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${isMobilePreview ? 'hidden sm:flex' : 'flex'} ${isSidebarCollapsed ? 'w-full opacity-100 visible' : 'opacity-100 visible'}`}
           style={{ flex: '1 1 auto', width: isSidebarCollapsed ? '100%' : 'auto' }}
         >
-           <div className="bg-white border-b border-gray-200 px-4 py-2 text-xs font-medium text-gray-400 uppercase tracking-wider flex justify-between items-center shrink-0">
+           <div className="bg-white border-b border-gray-200 px-4 py-2 text-xs font-medium text-gray-400 tracking-wider flex justify-between items-center shrink-0">
              <div className="flex items-center gap-2">
                <span>预览</span>
                {enableTranslation && <span className="text-orange-500 font-bold px-1.5 py-0.5 bg-orange-50 rounded text-[10px] border border-orange-100">中文</span>}
              </div>
-             {isTranslating && (
-               <div className="flex items-center gap-2 bg-white/95 backdrop-blur px-3 py-1 rounded-full shadow-sm border border-emerald-100 text-xs text-emerald-700">
-                 <Loader2 size={12} className="animate-spin text-emerald-500" />
-                 <span>翻译中... {Math.round((translationProgress.current / Math.max(translationProgress.total, 1)) * 100)}%</span>
+
+             {uploadedFileName && (
+               <div className="text-gray-500 text-sm font-medium truncate max-w-xs mx-4">
+                 {uploadedFileName}
                </div>
              )}
-             {isMobilePreview && (
-               <button onClick={() => setIsMobilePreview(false)} className="sm:hidden text-gray-500">Close</button>
-             )}
+
+             <div className="flex items-center gap-2">
+               {isTranslating && (
+                 <div className="flex items-center gap-2 bg-white/95 backdrop-blur px-3 py-1 rounded-full shadow-sm border border-emerald-100 text-xs text-emerald-700">
+                   <Loader2 size={12} className="animate-spin text-emerald-500" />
+                   <span>翻译中... {Math.round((translationProgress.current / Math.max(translationProgress.total, 1)) * 100)}%</span>
+                 </div>
+               )}
+               {isMobilePreview && (
+                 <button onClick={() => setIsMobilePreview(false)} className="sm:hidden text-gray-500">Close</button>
+               )}
+             </div>
            </div>
            
            <div className="flex-1 overflow-hidden relative bg-gray-100 p-4 sm:p-8 flex justify-center">
