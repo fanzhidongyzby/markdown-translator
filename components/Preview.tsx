@@ -2,7 +2,7 @@
 import React, { forwardRef, useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import RemarkGfm from 'remark-gfm';
-import { ChevronDown, ChevronRight, Copy, Check, Loader2, Globe, MessageSquarePlus, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, Check, MessageSquarePlus, X } from 'lucide-react';
 import { ThemeType, THEMES, AISettings, Annotation } from '../types';
 import { translateMarkdownToChinese } from '../services/translateService';
 import { createPortal } from 'react-dom';
@@ -12,11 +12,10 @@ interface PreviewProps {
   theme: ThemeType;
   enableTranslation: boolean;
   onElementClick?: (text: string, offsetTop: number) => void;
-  onTranslatingStatusChange?: (isTranslating: boolean, progress?: { current: number; total: number }) => void;
+  onTranslatingStatusChange?: (isTranslating: boolean, progress?: { current: number, total: number }) => void;
   settings?: AISettings;
   annotations: Annotation[];
-  onAddAnnotation: (text: string, note: string, contextHash: string, startOffset: number, endOffset: number) => void;
-  onRemoveAnnotation?: (id: string) => void;
+  onAddAnnotation: (text: string, note: string, contextHash: string, startOffset: number, endOffset: number, globalStartOffset?: number, globalEndOffset?: number) => void;
 }
 
 // Simple string hash for context identification
@@ -137,17 +136,17 @@ const getTextContent = (node: React.ReactNode): string => {
 };
 
 // Define CodeBlock first so we can reference it in RecursiveHighlighter
-const CodeBlock = ({ inline, className, children, annotations, node, ...props }: any) => {
+const CodeBlock = ({ inline, className, children, ...props }: any) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [copied, setCopied] = useState(false);
-  
+
   // Robust Inline Detection:
   // 1. Explicit inline prop.
   // 2. OR: No "language-" class AND the text content has no newlines (after trimming).
   const contentText = getTextContent(children);
   const cleanContent = contentText.replace(/\n$/, ''); // Trim trailing newline from fence
   const match = /language-(\w+)/.exec(className || '');
-  
+
   // Note: react-markdown v9+ often drops `inline` prop, so we rely heavily on content analysis.
   // Inline code usually has NO className and NO internal newlines.
   const isInline = inline || (!match && !cleanContent.includes('\n'));
@@ -162,9 +161,8 @@ const CodeBlock = ({ inline, className, children, annotations, node, ...props }:
 
   const language = match ? match[1] : 'text';
   const codeContent = contentText.replace(/\n$/, '');
-  
+
   const hash = djb2Hash(codeContent);
-  const blockAnnotations = annotations ? annotations.filter((a: Annotation) => a.contextHash === hash) : [];
   const offsetTracker = { value: 0 };
 
   const handleCopy = (e: React.MouseEvent) => {
@@ -195,7 +193,7 @@ const CodeBlock = ({ inline, className, children, annotations, node, ...props }:
       {isExpanded && (
         <div className="overflow-x-auto p-4 bg-gray-50">
           <code className={`${className} block`} data-block-hash={hash} {...props}>
-             <RecursiveHighlighter node={codeContent} annotations={blockAnnotations} currentOffset={offsetTracker} />
+             <RecursiveHighlighter node={codeContent} currentOffset={offsetTracker} />
           </code>
         </div>
       )}
@@ -205,58 +203,20 @@ const CodeBlock = ({ inline, className, children, annotations, node, ...props }:
 
 const RecursiveHighlighter: React.FC<{
   node: React.ReactNode;
-  annotations: Annotation[];
-  currentOffset: { value: number }; 
-}> = ({ node, annotations, currentOffset }) => {
-  
+  currentOffset: { value: number };
+}> = ({ node, currentOffset }) => {
+
+  // Simply render the node without any highlighting
   if (typeof node === 'string') {
-    const text = node;
-    const start = currentOffset.value;
-    const end = start + text.length;
-    currentOffset.value = end; 
-
-    const relevant = annotations.filter(a => 
-      a.startOffset < end && a.endOffset > start
-    ).sort((a, b) => a.startOffset - b.startOffset);
-
-    if (relevant.length === 0) return <>{text}</>;
-
-    const fragments: React.ReactNode[] = [];
-    let cursor = start;
-
-    for (const ann of relevant) {
-      const hlStart = Math.max(ann.startOffset, cursor);
-      const hlEnd = Math.min(ann.endOffset, end);
-
-      if (hlStart >= hlEnd) continue;
-
-      if (hlStart > cursor) {
-        fragments.push(text.slice(cursor - start, hlStart - start));
-      }
-
-      const content = text.slice(hlStart - start, hlEnd - start);
-      fragments.push(
-        <span key={ann.id + '-' + cursor} className="group relative inline cursor-help border-b-2 border-dashed border-yellow-400 bg-yellow-50/50 decoration-clone">
-          {content}
-           <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50 pointer-events-none text-left font-sans whitespace-normal select-none">
-            {ann.note}
-            <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></span>
-          </span>
-        </span>
-      );
-      cursor = hlEnd;
-    }
-
-    if (cursor < end) fragments.push(text.slice(cursor - start));
-
-    return <>{fragments}</>;
+    currentOffset.value += node.length;
+    return <>{node}</>;
   }
 
   // FIX: Identify CodeBlock explicitly to prevent recursion loop.
   // We do NOT recurse into CodeBlock, effectively handing off control to the CodeBlock component itself.
   if (React.isValidElement(node)) {
     const isCodeBlock = (node.type === CodeBlock) || ((node.props as any).node?.tagName === 'code');
-    
+
     if (isCodeBlock) {
       const text = getTextContent(node);
       currentOffset.value += text.length;
@@ -265,14 +225,13 @@ const RecursiveHighlighter: React.FC<{
 
     const props = (node.props as any) || {};
     const children = props.children;
-    
+
     if (!children) return node;
 
     const processedChildren = React.Children.map(children, (child) => (
-      <RecursiveHighlighter 
-        node={child} 
-        annotations={annotations} 
-        currentOffset={currentOffset} 
+      <RecursiveHighlighter
+        node={child}
+        currentOffset={currentOffset}
       />
     ));
 
@@ -283,11 +242,10 @@ const RecursiveHighlighter: React.FC<{
     return (
       <>
         {node.map((child, i) => (
-          <RecursiveHighlighter 
-            key={i} 
-            node={child} 
-            annotations={annotations} 
-            currentOffset={currentOffset} 
+          <RecursiveHighlighter
+            key={i}
+            node={child}
+            currentOffset={currentOffset}
           />
         ))}
       </>
@@ -299,22 +257,19 @@ const RecursiveHighlighter: React.FC<{
 
 const AnnotatedBlock: React.FC<{
   children: React.ReactNode,
-  annotations: Annotation[],
   as?: React.ElementType,
   className?: string,
-  [key: string]: any 
-}> = ({ children, annotations, as: Component = 'div', className, ...props }) => {
+  [key: string]: any
+}> = ({ children, as: Component = 'div', className, ...props }) => {
   const textContent = getTextContent(children);
   const hash = djb2Hash(textContent);
-  const blockAnnotations = annotations.filter(a => a.contextHash === hash);
   const offsetTracker = { value: 0 };
 
   return (
     <Component className={className} data-block-hash={hash} {...props}>
-      <RecursiveHighlighter 
-        node={children} 
-        annotations={blockAnnotations} 
-        currentOffset={offsetTracker} 
+      <RecursiveHighlighter
+        node={children}
+        currentOffset={offsetTracker}
       />
     </Component>
   );
@@ -348,16 +303,15 @@ class TaskQueue {
   }
 }
 
-const Preview = forwardRef<HTMLDivElement, PreviewProps>(({ 
+const Preview = forwardRef<HTMLDivElement, PreviewProps>(({
   content, theme, enableTranslation, onElementClick, settings, onTranslatingStatusChange,
   annotations, onAddAnnotation
 }, ref) => {
   const currentTheme = THEMES[theme];
   const [displayedContent, setDisplayedContent] = useState(content);
   const [isTranslating, setIsTranslating] = useState(false);
-  const [progress, setProgress] = useState({ current: 0, total: 0 });
   
-  const [selectionPopup, setSelectionPopup] = useState<{ x: number, y: number, text: string, contextHash: string, start: number, end: number } | null>(null);
+  const [selectionPopup, setSelectionPopup] = useState<{ x: number, y: number, text: string, contextHash: string, start: number, end: number, globalStart?: number, globalEnd?: number } | null>(null);
   const [noteInput, setNoteInput] = useState("");
   const popupRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null); 
@@ -407,7 +361,6 @@ const Preview = forwardRef<HTMLDivElement, PreviewProps>(({
 
       setIsTranslating(true);
       const initialProgress = { current: totalBlocks - blocksToTranslate.length, total: totalBlocks };
-      setProgress(initialProgress);
       if (onTranslatingStatusChange) onTranslatingStatusChange(true, initialProgress);
 
       const batchSize = settings?.batchSize || 10;
@@ -439,7 +392,6 @@ const Preview = forwardRef<HTMLDivElement, PreviewProps>(({
       const updateProgress = () => {
          completedCount++;
          const newProgress = { current: Math.min(completedCount, totalBlocks), total: totalBlocks };
-         setProgress(newProgress);
          if (onTranslatingStatusChange) onTranslatingStatusChange(true, newProgress);
       };
 
@@ -534,22 +486,93 @@ const Preview = forwardRef<HTMLDivElement, PreviewProps>(({
 
       let anchorEl = selection.anchorNode.nodeType === 3 ? selection.anchorNode.parentElement : selection.anchorNode as HTMLElement;
       let focusEl = selection.focusNode.nodeType === 3 ? selection.focusNode.parentElement : selection.focusNode as HTMLElement;
-      
-      const blockContainer = anchorEl?.closest('[data-block-hash]');
-      if (!blockContainer || !contentRef.current?.contains(blockContainer) || !blockContainer.contains(focusEl)) {
+
+      const anchorBlockContainer = anchorEl?.closest('[data-block-hash]');
+      const focusBlockContainer = focusEl?.closest('[data-block-hash]');
+
+      // Check if both anchor and focus are within contentRef
+      if (!contentRef.current?.contains(anchorBlockContainer) || !contentRef.current?.contains(focusBlockContainer)) {
         setSelectionPopup(null);
         return;
       }
 
-      const hash = blockContainer.getAttribute('data-block-hash');
-      if (!hash) return;
       const selectedText = selection.toString();
       if (!selectedText.trim()) return;
 
+      // Use anchor block container for context hash and offset calculations
+      const blockContainer = anchorBlockContainer;
+      const hash = blockContainer?.getAttribute('data-block-hash');
+      if (!hash) return;
+
       const startOffset = getSelectionOffsetRelativeToContainer(blockContainer as HTMLElement, selection.anchorNode!, selection.anchorOffset);
-      const endOffset = getSelectionOffsetRelativeToContainer(blockContainer as HTMLElement, selection.focusNode!, selection.focusOffset);
+      // For cross-block selections, we might need to adjust the end offset
+      let endOffset;
+      if (anchorBlockContainer === focusBlockContainer) {
+        // Same block selection
+        endOffset = getSelectionOffsetRelativeToContainer(blockContainer as HTMLElement, selection.focusNode!, selection.focusOffset);
+      } else {
+        // Cross-block selection - use the end of the anchor block
+        endOffset = (blockContainer?.textContent || '').length;
+      }
 
       if (startOffset === -1 || endOffset === -1) return;
+
+      // Calculate global offsets for cross-block selections
+      let globalStart, globalEnd;
+      if (anchorBlockContainer !== focusBlockContainer) {
+        // For cross-block selections, calculate actual global offsets
+        // First, get the global start position
+        const allBlocks = Array.from(contentRef.current?.children || []);
+        let cumulativeLength = 0;
+        let foundAnchorBlock = false;
+        let foundFocusBlock = false;
+
+        for (const block of allBlocks) {
+          if (block === anchorBlockContainer) {
+            globalStart = cumulativeLength + startOffset;
+            foundAnchorBlock = true;
+            if (foundFocusBlock) break; // Both positions found
+          } else if (block === focusBlockContainer) {
+            globalEnd = cumulativeLength + endOffset;
+            foundFocusBlock = true;
+            if (foundAnchorBlock) break; // Both positions found
+          }
+
+          // Add the length of this block plus a newline character
+          if (block.textContent) {
+            cumulativeLength += block.textContent.length + 1; // +1 for newline
+          }
+        }
+
+        // Handle case where we didn't find one of the blocks
+        if (!foundAnchorBlock) {
+          globalStart = undefined;
+        }
+        if (!foundFocusBlock) {
+          globalEnd = undefined;
+        }
+
+        // Ensure proper ordering (globalStart should be less than globalEnd)
+        if (globalStart !== undefined && globalEnd !== undefined && globalStart > globalEnd) {
+          [globalStart, globalEnd] = [globalEnd, globalStart];
+        }
+      } else {
+        // For same-block selections, calculate global offset within the entire document
+        const allBlocks = Array.from(contentRef.current?.children || []);
+        let cumulativeLength = 0;
+
+        for (const block of allBlocks) {
+          if (block === anchorBlockContainer) {
+            globalStart = cumulativeLength + Math.min(startOffset, endOffset);
+            globalEnd = cumulativeLength + Math.max(startOffset, endOffset);
+            break;
+          }
+          // Add the length of this block plus a newline character
+          if (block.textContent) {
+            cumulativeLength += block.textContent.length + 1; // +1 for newline
+          }
+        }
+      }
 
       const rect = selection.getRangeAt(0).getBoundingClientRect();
       setSelectionPopup({
@@ -558,7 +581,9 @@ const Preview = forwardRef<HTMLDivElement, PreviewProps>(({
         text: selectedText,
         contextHash: hash,
         start: Math.min(startOffset, endOffset),
-        end: Math.max(startOffset, endOffset)
+        end: Math.max(startOffset, endOffset),
+        globalStart,
+        globalEnd
       });
       setNoteInput("");
     };
@@ -570,7 +595,15 @@ const Preview = forwardRef<HTMLDivElement, PreviewProps>(({
   const saveAnnotation = (e?: React.MouseEvent | React.KeyboardEvent) => {
     if (e) { e.stopPropagation(); e.preventDefault(); }
     if (selectionPopup && noteInput.trim()) {
-      onAddAnnotation(selectionPopup.text, noteInput.trim(), selectionPopup.contextHash, selectionPopup.start, selectionPopup.end);
+      onAddAnnotation(
+        selectionPopup.text,
+        noteInput.trim(),
+        selectionPopup.contextHash,
+        selectionPopup.start,
+        selectionPopup.end,
+        selectionPopup.globalStart,
+        selectionPopup.globalEnd
+      );
       setSelectionPopup(null);
       window.getSelection()?.removeAllRanges();
     }
@@ -589,16 +622,16 @@ const Preview = forwardRef<HTMLDivElement, PreviewProps>(({
   };
 
   const components = {
-    h1: ({children, ...props}: any) => <AnnotatedBlock as="h1" className={currentTheme.h1} annotations={annotations} {...props}>{children}</AnnotatedBlock>,
-    h2: ({children, ...props}: any) => <AnnotatedBlock as="h2" className={currentTheme.h2} annotations={annotations} {...props}>{children}</AnnotatedBlock>,
-    h3: ({children, ...props}: any) => <AnnotatedBlock as="h3" className={currentTheme.h3} annotations={annotations} {...props}>{children}</AnnotatedBlock>,
-    h4: ({children, ...props}: any) => <AnnotatedBlock as="h4" className={currentTheme.h4} annotations={annotations} {...props}>{children}</AnnotatedBlock>,
-    p: ({children, ...props}: any) => <AnnotatedBlock as="p" className={currentTheme.p} annotations={annotations} {...props}>{children}</AnnotatedBlock>,
+    h1: ({children, ...props}: any) => <AnnotatedBlock as="h1" className={currentTheme.h1} {...props}>{children}</AnnotatedBlock>,
+    h2: ({children, ...props}: any) => <AnnotatedBlock as="h2" className={currentTheme.h2} {...props}>{children}</AnnotatedBlock>,
+    h3: ({children, ...props}: any) => <AnnotatedBlock as="h3" className={currentTheme.h3} {...props}>{children}</AnnotatedBlock>,
+    h4: ({children, ...props}: any) => <AnnotatedBlock as="h4" className={currentTheme.h4} {...props}>{children}</AnnotatedBlock>,
+    p: ({children, ...props}: any) => <AnnotatedBlock as="p" className={currentTheme.p} {...props}>{children}</AnnotatedBlock>,
     blockquote: ({children, ...props}: any) => <blockquote className={currentTheme.blockquote} {...props}>{children}</blockquote>,
-    li: ({children, ...props}: any) => <AnnotatedBlock as="li" className="mb-1" annotations={annotations} {...props}>{children}</AnnotatedBlock>,
+    li: ({children, ...props}: any) => <AnnotatedBlock as="li" className="mb-1" {...props}>{children}</AnnotatedBlock>,
     code: (props: any) => <CodeBlock {...props} annotations={annotations} />,
-    ul: (props: any) => <ul className={currentTheme.list} {...props} />,
-    ol: (props: any) => <ol className="list-decimal list-inside mb-4 space-y-1 text-gray-700" {...props} />,
+    ul: ({children, ...props}: any) => <ul className={currentTheme.list} {...props}>{children}</ul>,
+    ol: ({children, ...props}: any) => <ol className="list-decimal list-inside mb-4 space-y-1 text-gray-700" {...props}>{children}</ol>,
     a: (props: any) => <a className={currentTheme.link} {...props} />,
     img: (props: any) => <img className={currentTheme.img} {...props} />,
     hr: (props: any) => <hr className={currentTheme.hr} {...props} />,

@@ -156,7 +156,7 @@ export default function App() {
     localStorage.setItem('jadeMarkSettings', JSON.stringify(newSettings));
   };
 
-  const handleAddAnnotation = (text: string, note: string, contextHash: string, startOffset: number, endOffset: number) => {
+  const handleAddAnnotation = (text: string, note: string, contextHash: string, startOffset: number, endOffset: number, globalStartOffset?: number, globalEndOffset?: number) => {
     const newAnnotation: Annotation = {
       id: Date.now().toString(),
       text,
@@ -164,10 +164,12 @@ export default function App() {
       timestamp: Date.now(),
       contextHash,
       startOffset,
-      endOffset
+      endOffset,
+      globalStartOffset,
+      globalEndOffset
     };
     setAnnotations(prev => [...prev, newAnnotation]);
-    setIsNotesOpen(true); 
+    setIsNotesOpen(true);
   };
 
   const handleRemoveAnnotation = (id: string) => {

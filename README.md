@@ -39,6 +39,26 @@ A powerful, aesthetic Markdown editor tailored for content creators, featuring r
     ```
     Access the app at `http://localhost:3000`.
 
+4. Start the production server:
+    ```bash
+    npm run build && npm run preview
+    ```
+    Access the app at `http://localhost:4173`.
+
+### Docker Environment
+
+1. Build the docker image:
+   ```
+   docker build -t markdown-translator .
+   ```
+
+2. Start container:
+   ```
+   docker run -d -p 4173:4173 --name markdown-translator markdown-translator
+   ```
+   Access the app at `http://localhost:4173`.
+
+
 ## Configuration
 
 To use the AI translation features effectively:

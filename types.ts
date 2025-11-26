@@ -39,6 +39,8 @@ export interface Annotation {
   contextHash: string; // Hash of the containing block to prevent duplicates in other blocks
   startOffset: number; // Start index in the block text
   endOffset: number; // End index in the block text
+  globalStartOffset?: number; // Start index in the entire document
+  globalEndOffset?: number; // End index in the entire document
 }
 
 export const THEMES: Record<ThemeType, ThemeStyles> = {
