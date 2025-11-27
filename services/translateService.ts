@@ -76,9 +76,7 @@ const customFetchStream = async (
 
     // Try proxy
     if (process.env.PROXY_SERVER) {
-      const baseOrigin = new URL(baseUrl).origin;
-      const currentOrigin = window.location.origin;
-      if (baseOrigin !== currentOrigin && fetchUrl.startsWith(process.env.PROXY_SERVER)) {
+      if (fetchUrl.startsWith(process.env.PROXY_SERVER)) {
         fetchUrl = "/api-proxy" + fetchUrl.replace(process.env.PROXY_SERVER, "")
       }
     }

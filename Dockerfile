@@ -21,4 +21,4 @@ RUN rm -rf node_modules package-lock.json && npm install && npm run build
 EXPOSE 4173
 
 # 入口点
-CMD ["npm", "run", "preview"]
+CMD ["bash", "./scripts/start.sh"]
