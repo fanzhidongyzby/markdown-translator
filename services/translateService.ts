@@ -62,24 +62,25 @@ const streamGoogleGenAI = async (
 // --- OpenAI / Custom Compatible Fetch ---
 const customFetchStream = async (
   systemPrompt: string,
-  userPrompt: string, 
-  settings: AISettings, 
+  userPrompt: string,
+  settings: AISettings,
   onChunk?: (text: string) => void
 ): Promise<string> => {
   try {
     let baseUrl = settings.baseUrl.trim();
     if (!baseUrl) throw new Error("Base URL is required for Custom provider");
 
-    // Robust URL construction
-    let fetchUrl: string;
+    // Remove trailing slash for cleaner append
+    const cleanBase = baseUrl.replace(/\/+$/, '');
+    let fetchUrl = `${cleanBase}/chat/completions`;
 
-    // Check if the user already provided the full endpoint
-    if (baseUrl.endsWith('/chat/completions')) {
-        fetchUrl = baseUrl;
-    } else {
-        // Remove trailing slash for cleaner append
-        const cleanBase = baseUrl.replace(/\/+$/, '');
-        fetchUrl = `${cleanBase}/chat/completions`;
+    // Try proxy
+    if (process.env.PROXY_SERVER) {
+      const baseOrigin = new URL(baseUrl).origin;
+      const currentOrigin = window.location.origin;
+      if (baseOrigin !== currentOrigin && fetchUrl.startsWith(process.env.PROXY_SERVER)) {
+        fetchUrl = "/api-proxy" + fetchUrl.replace(process.env.PROXY_SERVER, "")
+      }
     }
 
     // Default to gpt-4o for OpenAI endpoint compatibility if not specified
